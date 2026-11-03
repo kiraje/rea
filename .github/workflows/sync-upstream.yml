@@ -6,12 +6,24 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   sync:
     if: github.repository == 'kiraje/rea'
     runs-on: ubuntu-latest
     steps:
-      - run: gh repo sync ${{ github.repository }} --source morluto/rea --branch main
+      - name: Sync main from morluto/rea
+        run: gh repo sync ${{ github.repository }} --source morluto/rea --branch main
+        env:
+          # SYNC_TOKEN: fine-grained PAT with Contents + Workflows write.
+          # GITHUB_TOKEN cannot push upstream commits that touch .github/workflows.
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Keep upstream workflows disabled on the fork
+        run: |
+          gh workflow list --all --json id,path,state \
+            -q '.[] | select(.path != ".github/workflows/sync-upstream.yml" and .state == "active") | .id' \
+            | xargs -r -n1 gh workflow disable
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
